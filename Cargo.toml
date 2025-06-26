@@ -1,0 +1,21 @@
+[package]
+name = "ollama-ui"
+version = "0.1.0"
+edition = "2021"
+
+# Optimization for dual-core i5 with 16GB RAM
+[profile.release]
+opt-level = 3          # Maximum optimization
+lto = true            # Link-time optimization
+codegen-units = 1     # Better optimization for single binary
+panic = "abort"       # Smaller binary size
+strip = true          # Remove debug symbols
+
+[dependencies]
+eframe = "0.28"
+egui = "0.28"
+reqwest = { version = "0.12", features = ["json", "stream"] }
+tokio = { version = "1.0", features = ["full", "time", "io-util", "rt-multi-thread"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+chrono = { version = "0.4", features = ["serde"] }
