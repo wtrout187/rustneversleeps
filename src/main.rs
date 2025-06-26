@@ -1,8 +1,16 @@
+#![allow(clippy::let_unit_value)]
+#![allow(unused_must_use)]
+
 use eframe::egui;
 use reqwest;
 use serde::{Deserialize, Serialize};
 use std::sync::mpsc;
 use std::time::Instant;
+
+// Type aliases to reduce complexity
+type ComparisonResult = (ModelType, Result<(String, u64), String>);
+type StressResult = (usize, Result<(String, u64), String>);
+type ResponseResult = Result<(String, u64), String>;
 
 #[derive(Serialize, Clone)]
 struct OllamaRequest {
@@ -12,6 +20,7 @@ struct OllamaRequest {
 }
 
 #[derive(Deserialize)]
+#[allow(dead_code)]
 struct OllamaResponse {
     response: String,
     done: bool,
@@ -56,7 +65,7 @@ struct OllamaUI {
     ollama_url: String,
     q4_model_name: String,
     q5_model_name: String,
-    response_receiver: Option<mpsc::Receiver<Result<(String, u64), String>>>,
+    response_receiver: Option<mpsc::Receiver<ResponseResult>>,
     request_start_time: Option<Instant>,
     last_response_time: Option<u64>,
     stats: String,
@@ -66,7 +75,7 @@ struct OllamaUI {
     q5_response: String,
     q4_time: Option<u64>,
     q5_time: Option<u64>,
-    comparison_receiver: Option<mpsc::Receiver<(ModelType, Result<(String, u64), String>)>>,
+    comparison_receiver: Option<mpsc::Receiver<ComparisonResult>>,
     // Cooldown mechanism to prevent overwhelming Ollama
     last_preload_time: Option<Instant>,
     cooldown_remaining: Option<u64>,
@@ -75,13 +84,14 @@ struct OllamaUI {
     session_stats: SessionStats,
     // Stress test specific fields
     is_stress_testing: bool,
-    stress_test_receiver: Option<mpsc::Receiver<(usize, Result<(String, u64), String>)>>,
+    stress_test_receiver: Option<mpsc::Receiver<StressResult>>,
     stress_test_results: Vec<StressTestResult>,
     stress_test_start_time: Option<Instant>,
 }
 
 #[derive(Clone)]
 struct StressTestResult {
+    #[allow(dead_code)]
     request_id: usize,
     response_time_ms: Option<u64>,
     success: bool,
@@ -175,7 +185,7 @@ impl OllamaUI {
         
         std::thread::spawn(move || {
             let rt = tokio::runtime::Runtime::new().unwrap();
-            let _ = rt.block_on(async move {
+            rt.block_on(async move {
                 println!("🔄 Sending request to: {}", url_clone);
                 println!("📝 Model: {}", request_clone.model);
                 println!("💬 Prompt: {}", &request_clone.prompt[..std::cmp::min(50, request_clone.prompt.len())]);
@@ -319,7 +329,7 @@ Ok::<(), String>(())
         
         std::thread::spawn(move || {
             let rt = tokio::runtime::Runtime::new().unwrap();
-            let _ = rt.block_on(async move {
+            rt.block_on(async move {
                 let client = reqwest::Client::builder()
                     .timeout(std::time::Duration::from_secs(10))
                     .build()
@@ -955,7 +965,7 @@ impl eframe::App for OllamaUI {
                     ui.label("💾 App Memory Usage:");
                     // Get current memory usage (approximation)
                     if let Ok(usage) = std::process::Command::new("ps")
-                        .args(&["-o", "rss=", "-p", &std::process::id().to_string()])
+                        .args(["-o", "rss=", "-p", &std::process::id().to_string()])
                         .output() 
                     {
                         if let Ok(mem_str) = String::from_utf8(usage.stdout) {
